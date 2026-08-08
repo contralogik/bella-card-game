@@ -7,15 +7,41 @@ const getAudioContext = (): AudioContextConstructor | undefined => {
   return window.AudioContext ?? (window as typeof window & { webkitAudioContext?: AudioContextConstructor }).webkitAudioContext;
 };
 
+const backgroundMusicUrl = `${import.meta.env.BASE_URL}audio/siege_of_the_sun_gates.mp3`;
+
 class GameAudio {
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
-  private music: GainNode | null = null;
   private effects: GainNode | null = null;
-  private musicTimer: number | null = null;
-  private musicStep = 0;
+  private backgroundMusic: HTMLAudioElement | null = null;
   private enabled = true;
   private mode: MusicMode = "none";
+
+  private getBackgroundMusic() {
+    if (typeof window === "undefined") return null;
+    if (!this.backgroundMusic) {
+      this.backgroundMusic = new Audio(backgroundMusicUrl);
+      this.backgroundMusic.loop = true;
+      this.backgroundMusic.preload = "auto";
+      this.backgroundMusic.volume = 0.2;
+      this.backgroundMusic.setAttribute("aria-hidden", "true");
+      this.backgroundMusic.style.display = "none";
+      document.body.appendChild(this.backgroundMusic);
+    }
+    return this.backgroundMusic;
+  }
+
+  private startBackgroundMusic() {
+    const track = this.getBackgroundMusic();
+    if (!track || !this.enabled || this.mode === "none") return;
+    void track.play().catch(() => undefined);
+  }
+
+  private stopBackgroundMusic(reset = false) {
+    if (!this.backgroundMusic) return;
+    this.backgroundMusic.pause();
+    if (reset) this.backgroundMusic.currentTime = 0;
+  }
 
   private async ensureContext() {
     const AudioContextClass = getAudioContext();
@@ -23,12 +49,9 @@ class GameAudio {
     if (!this.context) {
       this.context = new AudioContextClass();
       this.master = this.context.createGain();
-      this.music = this.context.createGain();
       this.effects = this.context.createGain();
       this.master.gain.value = 0.58;
-      this.music.gain.value = 0.12;
       this.effects.gain.value = 0.34;
-      this.music.connect(this.master);
       this.effects.connect(this.master);
       this.master.connect(this.context.destination);
     }
@@ -53,55 +76,29 @@ class GameAudio {
     oscillator.stop(start + duration + 0.03);
   }
 
-  private stopMusicTimer() {
-    if (this.musicTimer !== null) window.clearInterval(this.musicTimer);
-    this.musicTimer = null;
-    this.musicStep = 0;
-  }
-
-  private scheduleMusicStep() {
-    if (!this.enabled || this.mode === "none" || !this.context || !this.music) return;
-    const patterns: Record<Exclude<MusicMode, "none">, number[]> = {
-      draw: [220, 277.18, 329.63, 415.3, 329.63, 277.18],
-      battle: [110, 164.81, 123.47, 196, 146.83, 220, 164.81, 246.94],
-      result: [261.63, 329.63, 392, 523.25, 392, 329.63],
-    };
-    const pattern = patterns[this.mode];
-    const note = pattern[this.musicStep % pattern.length];
-    const isBattle = this.mode === "battle";
-    this.tone(note, isBattle ? 0.22 : 0.5, 0, isBattle ? 0.095 : 0.075, isBattle ? "sawtooth" : "sine", this.music);
-    if (isBattle && this.musicStep % 2 === 0) this.tone(55, 0.14, 0, 0.055, "triangle", this.music);
-    this.musicStep += 1;
-  }
-
-  private startMusicTimer() {
-    this.stopMusicTimer();
-    if (!this.enabled || this.mode === "none") return;
-    this.scheduleMusicStep();
-    const interval = this.mode === "battle" ? 310 : this.mode === "draw" ? 560 : 680;
-    this.musicTimer = window.setInterval(() => this.scheduleMusicStep(), interval);
-  }
-
   async setEnabled(enabled: boolean) {
     this.enabled = enabled;
     if (!enabled) {
-      this.stopMusicTimer();
+      this.stopBackgroundMusic();
       if (this.context && this.master) this.master.gain.setTargetAtTime(0.0001, this.context.currentTime, 0.025);
       return;
     }
+    this.startBackgroundMusic();
     const context = await this.ensureContext();
     if (!context || !this.master) return;
     this.master.gain.setTargetAtTime(0.58, context.currentTime, 0.03);
-    this.startMusicTimer();
     this.playSelect();
   }
 
   async setMode(mode: MusicMode) {
     this.mode = mode;
+    if (mode === "none") {
+      this.stopBackgroundMusic(true);
+      return;
+    }
     if (!this.enabled) return;
-    const context = await this.ensureContext();
-    if (!context) return;
-    this.startMusicTimer();
+    this.startBackgroundMusic();
+    await this.ensureContext();
   }
 
   async playReveal(power = 0) {
@@ -157,7 +154,7 @@ class GameAudio {
 
   stop() {
     this.mode = "none";
-    this.stopMusicTimer();
+    this.stopBackgroundMusic(true);
   }
 }
 
