@@ -617,7 +617,7 @@ function App() {
         </div>
       </section>
       <section className="pool-strip">
-        <div><span className="section-kicker">本局卡池</span><strong>43张动漫卡</strong><small className="pool-rule">CSP 每局最多出现 1 张</small></div>
+        <div><span className="section-kicker">本局卡池</span><strong>{cards.length}张动漫卡</strong><small className="pool-rule">CSP 每局最多出现 1 张</small></div>
         <RarityLegend />
       </section>
     </main>
@@ -869,7 +869,7 @@ function App() {
       {phase === "private" && renderPrivate()}
       {phase === "battle" && renderBattle()}
       {phase === "result" && renderResult()}
-      <footer className="app-footer"><span>贝拉卡斗场 · 43张卡池</span><span>第三人裁判模式</span></footer>
+      <footer className="app-footer"><span>贝拉卡斗场 · {cards.length}张卡池</span><span>第三人裁判模式</span></footer>
     </div>
   );
 }
