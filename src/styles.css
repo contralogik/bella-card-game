@@ -272,6 +272,20 @@ button:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 3p
   .round-markers i { width: 24px; height: 24px; }
 }
 
+@media (max-width: 480px) {
+  .app-shell { padding-top: 10px; padding-bottom: 10px; }
+  .app-header { padding-bottom: 8px; }
+  .private-layout { padding-top: 8px; padding-bottom: 20px; }
+  .private-header { gap: 8px; margin-bottom: 8px; }
+  .private-header p { max-width: none; line-height: 1.35; }
+  .single-reveal-panel { min-height: 0; padding: 12px 10px 16px; }
+  .draw-progress-head { gap: 8px; }
+  .reveal-instruction { margin: 10px 0 4px; min-height: 18px; }
+  .single-card-stage { width: min(66vw, 260px); margin-top: 2px; margin-bottom: 12px; }
+  .reveal-next-action { min-height: 48px; }
+  .privacy-reminder { margin-top: 10px; }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .lobby-orbit, .result-crown { animation: breathe 3.2s ease-in-out infinite; }
   .duel-card-wrap.revealed .card-tile { animation: card-in 420ms cubic-bezier(.2,.9,.25,1.2) both; }
