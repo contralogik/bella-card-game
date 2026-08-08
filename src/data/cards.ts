@@ -71,7 +71,7 @@ export const cards: Card[] = [
   { id: "diluc", name: "迪卢克", source: "原神", rarity: "R", hp: 96, atk: 44, def: 10, image: image("diluc-r.png") },
   { id: "traveler", name: "旅行者", source: "原神", rarity: "R", hp: 105, atk: 40, def: 12, image: image("traveler-r.png") },
   { id: "yanjue", name: "颜爵", source: "叶罗丽", rarity: "R", hp: 108, atk: 39, def: 13, image: image("yanjue-r.png") },
-  { id: "furina", name: "水神·芙宁娜", source: "原神", rarity: "CSP", hp: 240, atk: 100, def: 60, image: image("furina-csp.png") },
+  { id: "furina", name: "水神·芙宁娜", source: "原神", rarity: "CSP", hp: 205, atk: 86, def: 44, image: image("furina-csp.png") },
   { id: "bella-wenjian", name: "贝拉·问剑", source: "贝拉问剑录", rarity: "CSP", hp: 241, atk: 107, def: 37, image: image("bella-wenjian-csp.png") },
   { id: "qianchen", name: "芊辰", source: "原创角色", rarity: "CSP", hp: 230, atk: 77, def: 47, image: image("qianchen-csp.png") },
 ];
