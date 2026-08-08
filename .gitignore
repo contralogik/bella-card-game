@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+
+# Local browser QA captures are useful during development but not needed in the app repo.
+design/qa-*.png
