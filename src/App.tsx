@@ -63,8 +63,6 @@ type TeamBattleState = {
   winner: Winner | null;
 };
 
-const randomItem = <T,>(items: T[]) => items[Math.floor(Math.random() * items.length)];
-
 const shuffled = <T,>(items: T[]) => {
   const result = [...items];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -74,49 +72,15 @@ const shuffled = <T,>(items: T[]) => {
   return result;
 };
 
-const pickFromPool = (pool: Card[], predicate: (card: Card) => boolean) => {
-  const candidates = pool.filter(predicate);
-  const picked = candidates.length > 0 ? randomItem(candidates) : randomItem(pool);
-  const pickedIndex = pool.findIndex((card) => card.id === picked.id);
-  return pool.splice(pickedIndex, 1)[0];
-};
-
-const buildMatchPool = () => {
-  const cspCards = shuffled(cards.filter((card) => card.rarity === "CSP"));
-  const regularCards = cards.filter((card) => card.rarity !== "CSP");
-  // CSP 是冠冕级特殊卡，本局最多放入一张，避免一包卡同时出现三张数值怪。
-  return shuffled([...regularCards, ...(cspCards.length > 0 ? [cspCards[0]] : [])]);
-};
-
-const buildPack = (pool: Card[], packSize = PACK_SIZE) => {
-  const isHigh = (card: Card) => rankOf(card.rarity) >= rankOf("SSR");
-  const pack = [
-    pickFromPool(pool, (card) => card.rarity === "R"),
-    pickFromPool(pool, (card) => card.rarity === "R"),
-    pickFromPool(pool, (card) => card.rarity === "R" || card.rarity === "SR"),
-    pickFromPool(pool, (card) => card.rarity === "SR"),
-    pickFromPool(pool, (card) => card.rarity === "SR" || card.rarity === "SSR"),
-    pickFromPool(pool, isHigh),
-    pickFromPool(pool, isHigh),
-    pickFromPool(pool, () => true),
-  ];
-  while (pack.length < packSize) pack.push(pickFromPool(pool, () => true));
-  return pack;
-};
-
 const dealMatchPacks = (packSize = PACK_SIZE) => {
-  let best: [Card[], Card[]] | null = null;
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    const pool = buildMatchPool();
-    const packA = buildPack(pool, packSize);
-    const packB = buildPack(pool, packSize);
-    const highestA = Math.max(...packA.map((card) => rankOf(card.rarity)));
-    const highestB = Math.max(...packB.map((card) => rankOf(card.rarity)));
-    best = [packA, packB];
-    if (Math.abs(highestA - highestB) <= 2) return [packA, packB] as [Card[], Card[]];
+  // 一副 54 张牌先整体洗牌，再按 A、B、A、B 交替发牌；每张牌的概率完全相同。
+  const deck = shuffled(cards);
+  const packA: Card[] = [];
+  const packB: Card[] = [];
+  for (let index = 0; index < packSize * 2; index += 1) {
+    (index % 2 === 0 ? packA : packB).push(deck[index]);
   }
-  const fallbackPool = buildMatchPool();
-  return best ?? [buildPack(fallbackPool, packSize), buildPack(fallbackPool, packSize)];
+  return [packA, packB] as [Card[], Card[]];
 };
 
 const damageFor = (attacker: Card, defender: Card) => Math.max(5, attacker.atk - defender.def);
@@ -431,13 +395,21 @@ function App() {
 
   const advanceDraw = () => {
     if (!drawFaceUp) return;
+    if (privatePlayer === "A") {
+      setPrivatePlayer("B");
+      setDrawFaceUp(false);
+      void gameAudio.playAdvance();
+      return;
+    }
     if (drawIndex === activePackSize - 1) {
       setPrivateStage("select");
+      setPrivatePlayer("A");
       setDrawFaceUp(false);
       void gameAudio.playAdvance();
       return;
     }
     setDrawIndex((current) => current + 1);
+    setPrivatePlayer("A");
     setDrawFaceUp(false);
     void gameAudio.playAdvance();
   };
@@ -448,11 +420,10 @@ function App() {
     const nextLineups = { ...lineups, [privatePlayer]: lineup };
     setLineups(nextLineups);
     setSelection([]);
-    setPrivateStage("draw");
-    setDrawIndex(0);
     setDrawFaceUp(false);
     if (privatePlayer === "A") {
       setPrivatePlayer("B");
+      setPrivateStage("select");
       void gameAudio.playAdvance();
     } else {
       setPhase("battle");
@@ -585,7 +556,7 @@ function App() {
       <section className="lobby-intro">
         <div className="lobby-orbit"><Crown size={30} /></div>
         <h2>{gameMode === "team" ? "让整支队伍上场" : "把命运交给一包卡"}</h2>
-        <p>{gameMode === "team" ? "两位玩家各揭晓十张、选择七张，系统随机安排顺序；当前卡牌生命归零后才会换下一张。" : "两位玩家逐张揭晓八张卡、排出五张王牌，第三个人拿手机见证每一局翻牌。"}</p>
+        <p>{gameMode === "team" ? "两位玩家各揭晓十张、选择七张，系统随机安排顺序；当前卡牌生命归零后才会换下一张。" : "两位玩家交替揭晓八张卡，全部抽完后再排出五张王牌，第三个人拿手机见证每一局翻牌。"}</p>
         <div className="mode-picker" aria-label="选择对战模式">
           <button type="button" className={`mode-option ${gameMode === "duel" ? "is-active" : ""}`} onClick={() => setGameMode("duel")}>
             <Swords size={21} />
@@ -605,11 +576,11 @@ function App() {
       <section className="lobby-roles" aria-label="对局角色">
         <div className="role-card role-blue">
           <CircleUserRound size={24} />
-          <div><strong>贝拉阵营</strong><span>{gameMode === "team" ? "逐张揭晓10张 · 选7张" : "逐张揭晓8张 · 选5张"}</span></div>
+          <div><strong>贝拉阵营</strong><span>{gameMode === "team" ? "交替揭晓10张 · 选7张" : "交替揭晓8张 · 选5张"}</span></div>
         </div>
         <div className="role-card role-violet">
           <CircleUserRound size={24} />
-          <div><strong>芊辰阵营</strong><span>{gameMode === "team" ? "逐张揭晓10张 · 选7张" : "逐张揭晓8张 · 选5张"}</span></div>
+          <div><strong>芊辰阵营</strong><span>{gameMode === "team" ? "交替揭晓10张 · 选7张" : "交替揭晓8张 · 选5张"}</span></div>
         </div>
         <div className="role-card role-gold">
           <Eye size={24} />
@@ -617,7 +588,7 @@ function App() {
         </div>
       </section>
       <section className="pool-strip">
-        <div><span className="section-kicker">本局卡池</span><strong>{cards.length}张动漫卡</strong><small className="pool-rule">CSP 每局最多出现 1 张</small></div>
+        <div><span className="section-kicker">本局卡池</span><strong>{cards.length}张动漫卡</strong><small className="pool-rule">每张牌等概率 · 不设稀有度保底</small></div>
         <RarityLegend />
       </section>
     </main>
@@ -630,9 +601,9 @@ function App() {
         <div>
           <span className="section-kicker">私密阶段</span>
           <h2>{contestantName(privatePlayer)}的秘密卡包</h2>
-          <p>{privateStage === "draw" ? "一次只揭晓一张，享受每次翻牌。" : gameMode === "team" ? "十张都已揭晓，现在选择七张；系统会随机安排出战顺序。" : "八张都已揭晓，现在按出战顺序选择五张。"}</p>
+          <p>{privateStage === "draw" ? `双方交替揭牌：${contestantShortName(privatePlayer)}阵营正在揭晓第 ${drawIndex + 1} 张。` : gameMode === "team" ? "十张都已揭晓，现在选择七张；系统会随机安排出战顺序。" : "八张都已揭晓，现在按出战顺序选择五张。"}</p>
         </div>
-        <div className="private-step"><span>1</span><i /><span className={privatePlayer === "B" ? "is-active" : ""}>2</span></div>
+        <div className="private-step" aria-label={`当前私密阶段：${contestantName(privatePlayer)}`}><span className={privatePlayer === "A" ? "is-active" : ""}>A</span><i /><span className={privatePlayer === "B" ? "is-active" : ""}>B</span></div>
       </section>
       {privateStage === "draw" ? (
         <section className="single-reveal-panel">
@@ -658,8 +629,8 @@ function App() {
             )}
           </div>
           <button type="button" className="primary-action reveal-next-action" disabled={!drawFaceUp} onClick={advanceDraw}>
-            {drawIndex === activePackSize - 1 ? <Swords size={18} /> : <Hand size={18} />}
-            {drawIndex === activePackSize - 1 ? `查看${activePackSize}张卡，安排阵容` : "收入手牌，揭晓下一张"}
+            {privatePlayer === "B" && drawIndex === activePackSize - 1 ? <Swords size={18} /> : <Hand size={18} />}
+            {privatePlayer === "B" && drawIndex === activePackSize - 1 ? `查看${activePackSize}张卡，安排阵容` : `交给${contestantShortName(privatePlayer === "A" ? "B" : "A")}，揭晓下一张`}
           </button>
           <div className="privacy-reminder"><LockKeyhole size={15} /> 其他玩家请转身</div>
         </section>
