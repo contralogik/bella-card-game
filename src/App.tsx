@@ -148,13 +148,12 @@ const simulateTeamClash = (
 
 const winnerLabel = (winner: Winner) => (winner === "draw" ? "平局" : `${contestantName(winner)}获胜`);
 
+const cardBackImage = `${import.meta.env.BASE_URL}cards/card-back-contralogik.png`;
+
 function CardBack({ className = "" }: { className?: string }) {
   return (
     <div className={`card-back ${className}`} aria-label="卡牌背面">
-      <div className="card-back-orbit" />
-      <div className="card-back-sigil">✦</div>
-      <span>贝拉</span>
-      <small>卡斗场</small>
+      <img src={cardBackImage} alt="卡牌背面" />
     </div>
   );
 }
@@ -216,7 +215,6 @@ function CardTile({
           {imageState !== "loaded" && (
             <span className={`card-image-state ${imageState === "error" ? "is-error" : ""}`} role="status">
               <strong>{imageState === "error" ? "卡面加载失败" : "正在加载卡面"}</strong>
-              <small>{card.rarity}</small>
               {imageState === "error" && <em>仍可使用这张卡</em>}
             </span>
           )}
@@ -660,7 +658,7 @@ function App() {
               ))}
             </div>
           </div>
-          <p className="reveal-instruction">{drawFaceUp ? drawImageState === "loaded" ? `${currentDrawCard?.rarity} · ${currentDrawCard?.name}` : `${currentDrawCard?.rarity} · 卡面揭晓中` : "轻触卡背，揭晓角色"}</p>
+          <p className="reveal-instruction">{drawFaceUp ? drawImageState === "loaded" ? currentDrawCard?.name : "卡面揭晓中" : "轻触卡背，揭晓角色"}</p>
           <div className={`single-card-stage ${drawFaceUp ? "is-revealed" : ""}`}>
             <div className="reveal-rays" aria-hidden="true" />
             {currentDrawCard && (
