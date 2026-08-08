@@ -32,6 +32,9 @@ const LINEUP_SIZE = 5;
 const ROUND_COUNT = 5;
 const TEAM_PACK_SIZE = 10;
 const TEAM_LINEUP_SIZE = 7;
+const TEAM_FATIGUE_RATE = 0.2;
+
+type CardImageState = "loading" | "loaded" | "error";
 
 type RoundResult = {
   winner: Winner;
@@ -84,6 +87,7 @@ const dealMatchPacks = (packSize = PACK_SIZE) => {
 };
 
 const damageFor = (attacker: Card, defender: Card) => Math.max(5, attacker.atk - defender.def);
+const fatigueFor = (card: Card) => Math.ceil(card.hp * TEAM_FATIGUE_RATE);
 const contestantName = (contestant: Contestant) => contestant === "A" ? "贝拉阵营" : "芊辰阵营";
 const contestantShortName = (contestant: Contestant) => contestant === "A" ? "贝拉" : "芊辰";
 
@@ -161,6 +165,7 @@ function CardTile({
   selected,
   order,
   onClick,
+  onImageStateChange,
   large = false,
 }: {
   card?: Card;
@@ -168,13 +173,18 @@ function CardTile({
   selected?: boolean;
   order?: number;
   onClick?: () => void;
+  onImageStateChange?: (state: CardImageState) => void;
   large?: boolean;
 }) {
-  const [imageState, setImageState] = useState<"loading" | "loaded" | "error">(faceUp ? "loading" : "loaded");
+  const [imageState, setImageState] = useState<CardImageState>(faceUp ? "loading" : "loaded");
 
   useEffect(() => {
-    if (card) setImageState(faceUp ? "loading" : "loaded");
-  }, [card?.id, faceUp]);
+    if (card) {
+      const nextState: CardImageState = faceUp ? "loading" : "loaded";
+      setImageState(nextState);
+      onImageStateChange?.(nextState);
+    }
+  }, [card?.id, faceUp, onImageStateChange]);
 
   if (!card) return <CardBack className={large ? "card-tile-large" : ""} />;
 
@@ -194,13 +204,19 @@ function CardTile({
             alt={card.name}
             loading={large ? "eager" : "lazy"}
             decoding="async"
-            onLoad={() => setImageState("loaded")}
-            onError={() => setImageState("error")}
+            onLoad={() => {
+              setImageState("loaded");
+              onImageStateChange?.("loaded");
+            }}
+            onError={() => {
+              setImageState("error");
+              onImageStateChange?.("error");
+            }}
           />
           {imageState !== "loaded" && (
             <span className={`card-image-state ${imageState === "error" ? "is-error" : ""}`} role="status">
               <strong>{imageState === "error" ? "卡面加载失败" : "正在加载卡面"}</strong>
-              <small>{card.name} · {card.rarity}</small>
+              <small>{card.rarity}</small>
               {imageState === "error" && <em>仍可使用这张卡</em>}
             </span>
           )}
@@ -310,6 +326,7 @@ function App() {
   const [privateStage, setPrivateStage] = useState<PrivateStage>("draw");
   const [drawIndex, setDrawIndex] = useState(0);
   const [drawFaceUp, setDrawFaceUp] = useState(false);
+  const [drawImageState, setDrawImageState] = useState<CardImageState>("loaded");
   const [selection, setSelection] = useState<string[]>([]);
   const [lineups, setLineups] = useState<{ A: Card[]; B: Card[] }>({ A: [], B: [] });
   const [round, setRound] = useState(0);
@@ -353,6 +370,7 @@ function App() {
     setPrivateStage("draw");
     setDrawIndex(0);
     setDrawFaceUp(false);
+    setDrawImageState("loaded");
     setRound(0);
     setBattleStep("reveal");
     setPrivatePlayer("A");
@@ -368,6 +386,7 @@ function App() {
     setPrivateStage("draw");
     setDrawIndex(0);
     setDrawFaceUp(false);
+    setDrawImageState("loaded");
     setRoundResults([]);
     setBattleResult(null);
     setTeamBattle(null);
@@ -389,6 +408,7 @@ function App() {
 
   const revealDrawCard = () => {
     if (!currentDrawCard || drawFaceUp) return;
+    setDrawImageState("loading");
     setDrawFaceUp(true);
     void gameAudio.playReveal(rankOf(currentDrawCard.rarity));
   };
@@ -398,6 +418,7 @@ function App() {
     if (privatePlayer === "A") {
       setPrivatePlayer("B");
       setDrawFaceUp(false);
+      setDrawImageState("loaded");
       void gameAudio.playAdvance();
       return;
     }
@@ -405,12 +426,14 @@ function App() {
       setPrivateStage("select");
       setPrivatePlayer("A");
       setDrawFaceUp(false);
+      setDrawImageState("loaded");
       void gameAudio.playAdvance();
       return;
     }
     setDrawIndex((current) => current + 1);
     setPrivatePlayer("A");
     setDrawFaceUp(false);
+    setDrawImageState("loaded");
     void gameAudio.playAdvance();
   };
 
@@ -468,33 +491,55 @@ function App() {
   const startTeamFight = () => {
     if (!teamBattle || !teamCurrentA || !teamCurrentB || teamBattle.winner) return;
     const result = simulateTeamClash(teamCurrentA, teamCurrentB, teamBattle.aHealth, teamBattle.bHealth);
-    const clash: TeamClashResult = {
-      ...result,
-      aCard: teamCurrentA,
-      bCard: teamCurrentB,
-      aIndex: teamBattle.aIndex,
-      bIndex: teamBattle.bIndex,
-    };
-    const aDefeated = result.aHealth <= 0;
-    const bDefeated = result.bHealth <= 0;
+    let aHealth = Math.max(0, result.aHealth);
+    let bHealth = Math.max(0, result.bHealth);
+    const log = [...result.log];
+    const aWasDefeated = result.aHealth <= 0;
+    const bWasDefeated = result.bHealth <= 0;
+
+    if (!aWasDefeated && bWasDefeated) {
+      const fatigue = fatigueFor(teamCurrentA);
+      aHealth = Math.max(0, aHealth - fatigue);
+      log.push(`${teamCurrentA.name}连续作战疲劳 -${fatigue}`);
+    }
+    if (!bWasDefeated && aWasDefeated) {
+      const fatigue = fatigueFor(teamCurrentB);
+      bHealth = Math.max(0, bHealth - fatigue);
+      log.push(`${teamCurrentB.name}连续作战疲劳 -${fatigue}`);
+    }
+
+    const aDefeated = aHealth <= 0;
+    const bDefeated = bHealth <= 0;
     const nextAIndex = teamBattle.aIndex + (aDefeated ? 1 : 0);
     const nextBIndex = teamBattle.bIndex + (bDefeated ? 1 : 0);
     const aFinished = nextAIndex >= lineups.A.length;
     const bFinished = nextBIndex >= lineups.B.length;
     const winner: Winner | null = aFinished && bFinished ? "draw" : aFinished ? "B" : bFinished ? "A" : null;
+    const clashWinner: Winner = aDefeated && bDefeated ? "draw" : aDefeated ? "B" : bDefeated ? "A" : result.winner;
+    const clash: TeamClashResult = {
+      ...result,
+      winner: clashWinner,
+      aHealth,
+      bHealth,
+      log,
+      aCard: teamCurrentA,
+      bCard: teamCurrentB,
+      aIndex: teamBattle.aIndex,
+      bIndex: teamBattle.bIndex,
+    };
 
     setTeamBattle((current) => current ? ({
       ...current,
       aIndex: nextAIndex,
       bIndex: nextBIndex,
-      aHealth: aFinished ? 0 : aDefeated ? lineups.A[nextAIndex].hp : Math.max(0, result.aHealth),
-      bHealth: bFinished ? 0 : bDefeated ? lineups.B[nextBIndex].hp : Math.max(0, result.bHealth),
+      aHealth: aFinished ? 0 : aDefeated ? lineups.A[nextAIndex].hp : aHealth,
+      bHealth: bFinished ? 0 : bDefeated ? lineups.B[nextBIndex].hp : bHealth,
       clashes: [...current.clashes, clash],
       lastClash: clash,
       winner,
     }) : current);
     void gameAudio.playClash();
-    void gameAudio.playOutcome(winner ?? result.winner);
+    void gameAudio.playOutcome(winner ?? clashWinner);
 
     if (winner) {
       setBattleStep("done");
@@ -556,7 +601,7 @@ function App() {
       <section className="lobby-intro">
         <div className="lobby-orbit"><Crown size={30} /></div>
         <h2>{gameMode === "team" ? "让整支队伍上场" : "把命运交给一包卡"}</h2>
-        <p>{gameMode === "team" ? "两位玩家各揭晓十张、选择七张，系统随机安排顺序；当前卡牌生命归零后才会换下一张。" : "两位玩家交替揭晓八张卡，全部抽完后再排出五张王牌，第三个人拿手机见证每一局翻牌。"}</p>
+        <p>{gameMode === "team" ? "两位玩家各揭晓十张、选择七张，系统随机安排顺序；当前卡牌生命归零后才会换下一张，击败一张后会承受最大生命20%的疲劳伤害。" : "两位玩家交替揭晓八张卡，全部抽完后再排出五张王牌，第三个人拿手机见证每一局翻牌。"}</p>
         <div className="mode-picker" aria-label="选择对战模式">
           <button type="button" className={`mode-option ${gameMode === "duel" ? "is-active" : ""}`} onClick={() => setGameMode("duel")}>
             <Swords size={21} />
@@ -615,7 +660,7 @@ function App() {
               ))}
             </div>
           </div>
-          <p className="reveal-instruction">{drawFaceUp ? `${currentDrawCard?.rarity} · ${currentDrawCard?.name}` : "轻触卡背，揭晓角色"}</p>
+          <p className="reveal-instruction">{drawFaceUp ? drawImageState === "loaded" ? `${currentDrawCard?.rarity} · ${currentDrawCard?.name}` : `${currentDrawCard?.rarity} · 卡面揭晓中` : "轻触卡背，揭晓角色"}</p>
           <div className={`single-card-stage ${drawFaceUp ? "is-revealed" : ""}`}>
             <div className="reveal-rays" aria-hidden="true" />
             {currentDrawCard && (
@@ -624,6 +669,7 @@ function App() {
                 card={currentDrawCard}
                 faceUp={drawFaceUp}
                 large
+                onImageStateChange={setDrawImageState}
                 onClick={drawFaceUp ? undefined : revealDrawCard}
               />
             )}
@@ -706,7 +752,7 @@ function App() {
             <div><span className="section-kicker">团战裁判中</span><h2>第{markerIndex + 1}组卡牌 <small>/ 共{TEAM_LINEUP_SIZE}张轮换</small></h2></div>
             <div className="round-markers team-round-markers">{Array.from({ length: TEAM_LINEUP_SIZE }, (_, index) => <i className={index < markerIndex ? "is-past" : index === markerIndex ? "is-current" : ""} key={index}>{index < markerIndex ? "✓" : index + 1}</i>)}</div>
           </div>
-          <div className="team-battle-rule"><Flame size={15} /> 每张卡生命归零后才换下一张 · 出战顺序已随机</div>
+          <div className="team-battle-rule"><Flame size={15} /> 每张卡生命归零后才换下一张 · 击败一张后额外承受最大生命20%的疲劳伤害 · 出战顺序已随机</div>
           <div className="duel-table">
             <div className={`duel-card-wrap ${aFaceUp ? "revealed" : ""}`}><CardTile card={aCard} faceUp={aFaceUp} large /></div>
             <div className="versus-mark"><span>VS</span><i /></div>
