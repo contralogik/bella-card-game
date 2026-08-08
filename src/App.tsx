@@ -151,16 +151,42 @@ function CardTile({
   onClick?: () => void;
   large?: boolean;
 }) {
+  const [imageState, setImageState] = useState<"loading" | "loaded" | "error">(faceUp ? "loading" : "loaded");
+
+  useEffect(() => {
+    if (card) setImageState(faceUp ? "loading" : "loaded");
+  }, [card?.id, faceUp]);
+
   if (!card) return <CardBack className={large ? "card-tile-large" : ""} />;
+
   return (
     <button
       type="button"
       className={`card-tile ${large ? "card-tile-large" : ""} ${selected ? "is-selected" : ""} ${faceUp ? "is-face-up" : ""}`}
       onClick={onClick}
       disabled={!onClick}
+      aria-busy={faceUp && imageState !== "loaded"}
       aria-label={faceUp ? `${card.name}，${card.rarity}` : "未公开卡牌"}
     >
-      {faceUp ? <img src={card.image} alt={card.name} /> : <CardBack />}
+      {faceUp ? (
+        <>
+          <img
+            src={card.image}
+            alt={card.name}
+            loading={large ? "eager" : "lazy"}
+            decoding="async"
+            onLoad={() => setImageState("loaded")}
+            onError={() => setImageState("error")}
+          />
+          {imageState !== "loaded" && (
+            <span className={`card-image-state ${imageState === "error" ? "is-error" : ""}`} role="status">
+              <strong>{imageState === "error" ? "卡面加载失败" : "正在加载卡面"}</strong>
+              <small>{card.name} · {card.rarity}</small>
+              {imageState === "error" && <em>仍可使用这张卡</em>}
+            </span>
+          )}
+        </>
+      ) : <CardBack />}
       {selected && <span className="order-badge">{order}</span>}
     </button>
   );
