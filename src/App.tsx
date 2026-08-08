@@ -73,7 +73,7 @@ const shuffled = <T,>(items: T[]) => {
 };
 
 const dealMatchPacks = (packSize = PACK_SIZE) => {
-  // 一副 54 张牌先整体洗牌，再按 A、B、A、B 交替发牌；每张牌的概率完全相同。
+  // 整副卡池先整体洗牌，再按 A、B、A、B 交替发牌；每张牌的概率完全相同。
   const deck = shuffled(cards);
   const packA: Card[] = [];
   const packB: Card[] = [];
