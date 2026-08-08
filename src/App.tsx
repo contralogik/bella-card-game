@@ -149,6 +149,7 @@ const simulateTeamClash = (
 const winnerLabel = (winner: Winner) => (winner === "draw" ? "平局" : `${contestantName(winner)}获胜`);
 
 const cardBackImage = `${import.meta.env.BASE_URL}cards/card-back-contralogik.png`;
+const heroBackground = `${import.meta.env.BASE_URL}hero/bella-hero-bg.png`;
 
 function CardBack({ className = "" }: { className?: string }) {
   return (
@@ -596,9 +597,10 @@ function App() {
 
   const renderLobby = () => (
     <main className="lobby-layout">
+      <img className="lobby-hero-art" src={heroBackground} alt="" aria-hidden="true" />
       <section className="lobby-intro">
         <div className="lobby-orbit"><Crown size={30} /></div>
-        <h2>{gameMode === "team" ? "让整支队伍上场" : "把命运交给一包卡"}</h2>
+        <h2>{gameMode === "team" ? "让整支队伍上场" : "这张卡是欧皇是非酋？开了再说！决战一把！"}</h2>
         <p>{gameMode === "team" ? "两位玩家各揭晓十张、选择七张，系统随机安排顺序；当前卡牌生命归零后才会换下一张，击败一张后会承受最大生命20%的疲劳伤害。" : "两位玩家交替揭晓八张卡，全部抽完后再排出五张王牌，第三个人拿手机见证每一局翻牌。"}</p>
         <div className="mode-picker" aria-label="选择对战模式">
           <button type="button" className={`mode-option ${gameMode === "duel" ? "is-active" : ""}`} onClick={() => setGameMode("duel")}>
