@@ -21,7 +21,7 @@ import { gameAudio } from "./audio";
 import "./styles.css";
 
 type Contestant = "A" | "B";
-type GameMode = "duel" | "team";
+type GameMode = "duel" | "team" | "fate";
 type Phase = "lobby" | "private" | "battle" | "result";
 type BattleStep = "reveal" | "fight" | "done";
 type PrivateStage = "draw" | "select";
@@ -33,6 +33,53 @@ const ROUND_COUNT = 5;
 const TEAM_PACK_SIZE = 10;
 const TEAM_LINEUP_SIZE = 7;
 const TEAM_FATIGUE_RATE = 0.2;
+const FATE_PACK_SIZE = 5;
+const FATE_LINEUP_SIZE = 3;
+const FATE_ROUND_COUNT = 3;
+
+type FateEvent = {
+  id: string;
+  name: string;
+  description: string;
+  atkModifier?: number;
+  defModifier?: number;
+  damageModifier?: number;
+  lowHealthAttack?: number;
+  swapStats?: boolean;
+  lowRarityMultiplier?: number;
+  firstStrikeBonus?: number;
+};
+
+type PublicTactic = {
+  id: string;
+  name: string;
+  description: string;
+  symbol: string;
+  atkModifier?: number;
+  defModifier?: number;
+  ignoreDefense?: number;
+  firstStrikeBonus?: number;
+  lowHealthSideAttack?: number;
+};
+
+const FATE_EVENTS: FateEvent[] = [
+  { id: "rage", name: "狂暴", description: "双方攻击 +20。", atkModifier: 20 },
+  { id: "iron-wall", name: "铁壁", description: "双方防御 +15。", defModifier: 15 },
+  { id: "blood-moon", name: "血月", description: "每次命中额外造成 10 点伤害。", damageModifier: 10 },
+  { id: "backwater", name: "背水一战", description: "生命低于一半后，攻击 +25。", lowHealthAttack: 25 },
+  { id: "attribute-reversal", name: "属性反转", description: "本局攻击与防御互换。", swapStats: true },
+  { id: "commoner-light", name: "平民之光", description: "R、SR 卡造成的伤害提高 50%。", lowRarityMultiplier: 1.5 },
+  { id: "first-strike", name: "先手之势", description: "攻击较高者先手，首次命中额外 +8。", firstStrikeBonus: 8 },
+];
+
+const PUBLIC_TACTICS: PublicTactic[] = [
+  { id: "assault-order", name: "猛攻令", description: "双方攻击 +15。", symbol: "⚔", atkModifier: 15 },
+  { id: "shield-order", name: "护盾令", description: "双方防御 +20。", symbol: "◆", defModifier: 20 },
+  { id: "break-order", name: "破甲令", description: "双方攻击结算时无视 15 点防御。", symbol: "✦", ignoreDefense: 15 },
+  { id: "combo-order", name: "连击令", description: "攻击较高者首回合额外 +18 伤害。", symbol: "☄", firstStrikeBonus: 18 },
+  { id: "desperate-order", name: "决胜令", description: "当前生命较低的一方攻击 +25。", symbol: "☼", lowHealthSideAttack: 25 },
+  { id: "swap-order", name: "换势令", description: "本局攻击与防御互换。", symbol: "↔", },
+];
 
 type CardImageState = "loading" | "loaded" | "error";
 
@@ -43,6 +90,8 @@ type RoundResult = {
   aCard: Card;
   bCard: Card;
   log: string[];
+  event?: FateEvent;
+  tactic?: PublicTactic;
 };
 
 type TeamClashResult = {
@@ -91,14 +140,38 @@ const fatigueFor = (card: Card) => Math.ceil(card.hp * TEAM_FATIGUE_RATE);
 const contestantName = (contestant: Contestant) => contestant === "A" ? "贝拉阵营" : "芊辰阵营";
 const contestantShortName = (contestant: Contestant) => contestant === "A" ? "贝拉" : "芊辰";
 
-const simulateBattle = (a: Card, b: Card): Omit<RoundResult, "aCard" | "bCard"> => {
+const simulateBattle = (a: Card, b: Card, event?: FateEvent, tactic?: PublicTactic): Omit<RoundResult, "aCard" | "bCard"> => {
   let aHealth = a.hp;
   let bHealth = b.hp;
   const log: string[] = [];
 
   for (let turn = 1; turn <= 12; turn += 1) {
-    const aDamage = damageFor(a, b);
-    const bDamage = damageFor(b, a);
+    const getStats = (card: Card, health: number) => {
+      let atk = card.atk + (event?.atkModifier ?? 0) + (tactic?.atkModifier ?? 0);
+      let def = card.def + (event?.defModifier ?? 0) + (tactic?.defModifier ?? 0);
+      if (event?.swapStats) [atk, def] = [def, atk];
+      if (tactic?.id === "swap-order") [atk, def] = [def, atk];
+      if (event?.lowHealthAttack && health <= card.hp / 2) atk += event.lowHealthAttack;
+      return { atk, def };
+    };
+    const aStats = getStats(a, aHealth);
+    const bStats = getStats(b, bHealth);
+    if (tactic?.lowHealthSideAttack) {
+      if (aHealth < bHealth) aStats.atk += tactic.lowHealthSideAttack;
+      if (bHealth < aHealth) bStats.atk += tactic.lowHealthSideAttack;
+    }
+    const getDamage = (attacker: Card, attackerStats: { atk: number; def: number }, defenderStats: { atk: number; def: number }) => {
+      const defenseIgnore = event?.swapStats || tactic?.id === "swap-order" ? 0 : (tactic?.ignoreDefense ?? 0);
+      let damage = Math.max(5, attackerStats.atk - Math.max(0, defenderStats.def - defenseIgnore) + (event?.damageModifier ?? 0));
+      if (event?.lowRarityMultiplier && rankOf(attacker.rarity) <= rankOf("SR")) damage = Math.round(damage * event.lowRarityMultiplier);
+      return damage;
+    };
+    let aDamage = getDamage(a, aStats, bStats);
+    let bDamage = getDamage(b, bStats, aStats);
+    if (turn === 1 && event?.firstStrikeBonus && aStats.atk !== bStats.atk) {
+      if (aStats.atk > bStats.atk) aDamage += event.firstStrikeBonus;
+      else bDamage += event.firstStrikeBonus;
+    }
     aHealth -= bDamage;
     bHealth -= aDamage;
     if (turn <= 3 || aHealth <= 0 || bHealth <= 0) {
@@ -107,13 +180,13 @@ const simulateBattle = (a: Card, b: Card): Omit<RoundResult, "aCard" | "bCard"> 
 
     if (aHealth <= 0 || bHealth <= 0) {
       if (aHealth <= 0 && bHealth <= 0) {
-        return { winner: aDamage === bDamage ? "draw" : aDamage > bDamage ? "A" : "B", aHealth, bHealth, log };
+        return { winner: aDamage === bDamage ? "draw" : aDamage > bDamage ? "A" : "B", aHealth, bHealth, log, event, tactic };
       }
-      return { winner: aHealth > 0 ? "A" : "B", aHealth, bHealth, log };
+      return { winner: aHealth > 0 ? "A" : "B", aHealth, bHealth, log, event, tactic };
     }
   }
 
-  return { winner: aHealth === bHealth ? "draw" : aHealth > bHealth ? "A" : "B", aHealth, bHealth, log };
+  return { winner: aHealth === bHealth ? "draw" : aHealth > bHealth ? "A" : "B", aHealth, bHealth, log, event, tactic };
 };
 
 const simulateTeamClash = (
@@ -150,11 +223,28 @@ const winnerLabel = (winner: Winner) => (winner === "draw" ? "平局" : `${conte
 
 const cardBackImage = `${import.meta.env.BASE_URL}cards/card-back-contralogik.png`;
 const heroBackground = `${import.meta.env.BASE_URL}hero/bella-hero-bg.png`;
+const tacticImage = `${import.meta.env.BASE_URL}cards/tactic-common.png`;
 
 function CardBack({ className = "" }: { className?: string }) {
   return (
     <div className={`card-back ${className}`} aria-label="卡牌背面">
       <img src={cardBackImage} alt="卡牌背面" />
+    </div>
+  );
+}
+
+function PublicTacticCard({ tactic, revealed }: { tactic?: PublicTactic; revealed: boolean }) {
+  if (!tactic) return null;
+  return (
+    <div className={`public-tactic-card ${revealed ? "is-revealed" : "is-hidden"}`} aria-label={revealed ? `公共战术牌：${tactic.name}` : "未公开公共战术牌"}>
+      <img src={revealed ? tacticImage : cardBackImage} alt="" />
+      {revealed ? (
+        <div className="public-tactic-copy">
+          <span>PUBLIC TACTIC</span>
+          <strong>{tactic.symbol} {tactic.name}</strong>
+          <small>{tactic.description}</small>
+        </div>
+      ) : <span>公共战术牌</span>}
     </div>
   );
 }
@@ -333,10 +423,14 @@ function App() {
   const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
   const [battleResult, setBattleResult] = useState<RoundResult | null>(null);
   const [teamBattle, setTeamBattle] = useState<TeamBattleState | null>(null);
+  const [fateEvents, setFateEvents] = useState<FateEvent[]>([]);
+  const [fateTactics, setFateTactics] = useState<PublicTactic[]>([]);
   const [soundOn, setSoundOn] = useState(true);
 
-  const activePackSize = gameMode === "team" ? TEAM_PACK_SIZE : PACK_SIZE;
-  const activeLineupSize = gameMode === "team" ? TEAM_LINEUP_SIZE : LINEUP_SIZE;
+  const activePackSize = gameMode === "team" ? TEAM_PACK_SIZE : gameMode === "fate" ? FATE_PACK_SIZE : PACK_SIZE;
+  const activeLineupSize = gameMode === "team" ? TEAM_LINEUP_SIZE : gameMode === "fate" ? FATE_LINEUP_SIZE : LINEUP_SIZE;
+  const activeRoundCount = gameMode === "fate" ? FATE_ROUND_COUNT : ROUND_COUNT;
+  const isFateMode = gameMode === "fate";
   const currentPack = packs[privatePlayer];
   const currentSelection = selection.map((id) => currentPack.find((card) => card.id === id)).filter(Boolean) as Card[];
   const currentDrawCard = currentPack[drawIndex];
@@ -366,6 +460,8 @@ function App() {
     setRoundResults([]);
     setBattleResult(null);
     setTeamBattle(null);
+    setFateEvents([]);
+    setFateTactics([]);
     setPrivateStage("draw");
     setDrawIndex(0);
     setDrawFaceUp(false);
@@ -389,6 +485,8 @@ function App() {
     setRoundResults([]);
     setBattleResult(null);
     setTeamBattle(null);
+    setFateEvents(gameMode === "fate" ? shuffled(FATE_EVENTS).slice(0, FATE_ROUND_COUNT) : []);
+    setFateTactics(gameMode === "fate" ? shuffled(PUBLIC_TACTICS).slice(0, FATE_ROUND_COUNT) : []);
     setPhase("private");
     void gameAudio.setMode("draw");
   };
@@ -479,11 +577,14 @@ function App() {
 
   const startFight = () => {
     if (!currentA || !currentB) return;
-    const result = simulateBattle(currentA, currentB);
+    const event = isFateMode ? fateEvents[round] : undefined;
+    const tactic = isFateMode ? fateTactics[round] : undefined;
+    const result = simulateBattle(currentA, currentB, event, tactic);
     void gameAudio.playClash();
     void gameAudio.playOutcome(result.winner);
-    setBattleResult({ ...result, aCard: currentA, bCard: currentB });
-    setRoundResults((current) => [...current.slice(0, round), { ...result, aCard: currentA, bCard: currentB }]);
+    const completedResult = { ...result, aCard: currentA, bCard: currentB, event, tactic };
+    setBattleResult(completedResult);
+    setRoundResults((current) => [...current.slice(0, round), completedResult]);
     setBattleStep("done");
   };
 
@@ -556,7 +657,7 @@ function App() {
   };
 
   const nextRound = () => {
-    if (round === ROUND_COUNT - 1) {
+    if (round === activeRoundCount - 1) {
       setPhase("result");
       void gameAudio.setMode("result");
       return;
@@ -579,7 +680,7 @@ function App() {
         <div className="brand-seal"><Sparkles size={18} /></div>
         <div>
           <h1>贝拉卡斗场</h1>
-          <p>{gameMode === "team" ? "抽10选7 · 团战模式" : "抽8选5 · 1V1裁判模式"}</p>
+          <p>{gameMode === "team" ? "抽10选7 · 团战模式" : gameMode === "fate" ? "抽5选3 · 命运事件赛" : "抽8选5 · 1V1裁判模式"}</p>
         </div>
       </div>
       <div className="header-tools">
@@ -600,8 +701,8 @@ function App() {
       <img className="lobby-hero-art" src={heroBackground} alt="" aria-hidden="true" />
       <section className="lobby-intro">
         <div className="lobby-orbit"><Crown size={30} /></div>
-        <h2>{gameMode === "team" ? "让整支队伍上场" : "这张卡是欧皇是非酋？开了再说！决战一把！"}</h2>
-        <p>{gameMode === "team" ? "两位玩家各揭晓十张、选择七张，系统随机安排顺序；当前卡牌生命归零后才会换下一张，击败一张后会承受最大生命20%的疲劳伤害。" : "两位玩家交替揭晓八张卡，全部抽完后再排出五张王牌，第三个人拿手机见证每一局翻牌。"}</p>
+        <h2>{gameMode === "team" ? "让整支队伍上场" : gameMode === "fate" ? "抽五张，选三张，命运翻牌！" : "这张卡是欧皇是非酋？开了再说！决战一把！"}</h2>
+        <p>{gameMode === "team" ? "两位玩家各揭晓十张、选择七张，系统随机安排顺序；当前卡牌生命归零后才会换下一张，击败一张后会承受最大生命20%的疲劳伤害。" : gameMode === "fate" ? "双方各自交替揭晓五张卡，按顺序选择三张出战；每局公开一张命运事件和一张公共战术牌，只有生命、攻击、防御三项数值也能打出变化。" : "两位玩家交替揭晓八张卡，全部抽完后再排出五张王牌，第三个人拿手机见证每一局翻牌。"}</p>
         <div className="mode-picker" aria-label="选择对战模式">
           <button type="button" className={`mode-option ${gameMode === "duel" ? "is-active" : ""}`} onClick={() => setGameMode("duel")}>
             <Swords size={21} />
@@ -613,23 +714,28 @@ function App() {
             <span><strong>团战模式</strong><small>抽10选7 · 卡死才换人</small></span>
             {gameMode === "team" && <i>当前</i>}
           </button>
+          <button type="button" className={`mode-option mode-option-fate ${gameMode === "fate" ? "is-active" : ""}`} onClick={() => setGameMode("fate")}>
+            <Sparkles size={21} />
+            <span><strong>命运事件赛</strong><small>抽5选3 · 事件+公共战术</small></span>
+            {gameMode === "fate" && <i>当前</i>}
+          </button>
         </div>
         <button className="primary-action action-large" type="button" onClick={startMatch}>
-          <Sparkles size={18} /> {gameMode === "team" ? "开始团战" : "开始一局"} <ChevronRight size={18} />
+          <Sparkles size={18} /> {gameMode === "team" ? "开始团战" : gameMode === "fate" ? "开始事件赛" : "开始一局"} <ChevronRight size={18} />
         </button>
       </section>
       <section className="lobby-roles" aria-label="对局角色">
         <div className="role-card role-blue">
           <CircleUserRound size={24} />
-          <div><strong>贝拉阵营</strong><span>{gameMode === "team" ? "交替揭晓10张 · 选7张" : "交替揭晓8张 · 选5张"}</span></div>
+          <div><strong>贝拉阵营</strong><span>{gameMode === "team" ? "交替揭晓10张 · 选7张" : gameMode === "fate" ? "交替揭晓5张 · 选3张" : "交替揭晓8张 · 选5张"}</span></div>
         </div>
         <div className="role-card role-violet">
           <CircleUserRound size={24} />
-          <div><strong>芊辰阵营</strong><span>{gameMode === "team" ? "交替揭晓10张 · 选7张" : "交替揭晓8张 · 选5张"}</span></div>
+          <div><strong>芊辰阵营</strong><span>{gameMode === "team" ? "交替揭晓10张 · 选7张" : gameMode === "fate" ? "交替揭晓5张 · 选3张" : "交替揭晓8张 · 选5张"}</span></div>
         </div>
         <div className="role-card role-gold">
           <Eye size={24} />
-          <div><strong>裁判</strong><span>{gameMode === "team" ? "拿手机 · 公开团战" : "拿手机 · 公开五局"}</span></div>
+          <div><strong>裁判</strong><span>{gameMode === "team" ? "拿手机 · 公开团战" : gameMode === "fate" ? "拿手机 · 公开事件与战术" : "拿手机 · 公开五局"}</span></div>
         </div>
       </section>
       <section className="pool-strip">
@@ -646,7 +752,7 @@ function App() {
         <div>
           <span className="section-kicker">私密阶段</span>
           <h2>{contestantName(privatePlayer)}的秘密卡包</h2>
-          <p>{privateStage === "draw" ? `双方交替揭牌：${contestantShortName(privatePlayer)}阵营正在揭晓第 ${drawIndex + 1} 张。` : gameMode === "team" ? "十张都已揭晓，现在选择七张；系统会随机安排出战顺序。" : "八张都已揭晓，现在按出战顺序选择五张。"}</p>
+          <p>{privateStage === "draw" ? `双方交替揭牌：${contestantShortName(privatePlayer)}阵营正在揭晓第 ${drawIndex + 1} 张。` : gameMode === "team" ? "十张都已揭晓，现在选择七张；系统会随机安排出战顺序。" : gameMode === "fate" ? "五张都已揭晓，现在按顺序选择三张；每局会公开事件和公共战术牌。" : "八张都已揭晓，现在按出战顺序选择五张。"}</p>
         </div>
         <div className="private-step" aria-label={`当前私密阶段：${contestantName(privatePlayer)}`}><span className={privatePlayer === "A" ? "is-active" : ""}>A</span><i /><span className={privatePlayer === "B" ? "is-active" : ""}>B</span></div>
       </section>
@@ -683,10 +789,10 @@ function App() {
       ) : (
         <section className="private-panel selection-panel">
           <div className="private-panel-top">
-            <div><strong>{gameMode === "team" ? "选择7张团战卡" : "安排5张出战牌"}</strong><span>{gameMode === "team" ? "选中的卡会在团战中随机出场" : "点击顺序就是第1～5局的出场顺序"}</span></div>
+            <div><strong>{gameMode === "team" ? "选择7张团战卡" : gameMode === "fate" ? "选择3张事件赛卡牌" : "安排5张出战牌"}</strong><span>{gameMode === "team" ? "选中的卡会在团战中随机出场" : gameMode === "fate" ? "点击顺序就是第1～3局的出场顺序" : "点击顺序就是第1～5局的出场顺序"}</span></div>
             <span className="selection-count">已选 {selection.length}<small>/{activeLineupSize}</small></span>
           </div>
-          <div className={`lineup-preview ${gameMode === "team" ? "lineup-preview-team" : ""}`} aria-label={gameMode === "team" ? "七张团战卡" : "五张出战牌顺序"}>
+          <div className={`lineup-preview ${gameMode === "team" ? "lineup-preview-team" : gameMode === "fate" ? "lineup-preview-fate" : ""}`} aria-label={gameMode === "team" ? "七张团战卡" : gameMode === "fate" ? "三张事件赛出战牌顺序" : "五张出战牌顺序"}>
             {Array.from({ length: activeLineupSize }, (_, index) => {
               const card = currentSelection[index];
               return (
@@ -700,11 +806,11 @@ function App() {
           </div>
           <div className="private-pack selection-pack">
             {currentPack.map((card) => (
-              <CardTile key={card.id} card={card} faceUp selected={selection.includes(card.id)} order={gameMode === "duel" ? selection.indexOf(card.id) + 1 : undefined} onClick={() => toggleSelection(card.id)} />
+                <CardTile key={card.id} card={card} faceUp selected={selection.includes(card.id)} order={gameMode !== "team" ? selection.indexOf(card.id) + 1 : undefined} onClick={() => toggleSelection(card.id)} />
             ))}
           </div>
           <div className="private-actions">
-            <div className="reveal-note"><Eye size={16} /> {gameMode === "team" ? "选中的7张会随机出战" : "再点已选卡牌可取消"}</div>
+            <div className="reveal-note"><Eye size={16} /> {gameMode === "team" ? "选中的7张会随机出战" : gameMode === "fate" ? "每局会公开一张命运事件和一张公共战术牌" : "再点已选卡牌可取消"}</div>
             <button type="button" className="primary-action" disabled={selection.length !== activeLineupSize} onClick={lockLineup}>
               <LockKeyhole size={17} /> 锁定{activeLineupSize}张阵容并交给裁判
             </button>
@@ -790,20 +896,31 @@ function App() {
   const renderBattle = () => {
     if (gameMode === "team") return renderTeamBattle();
     const currentResult = battleResult;
+    const currentEvent = isFateMode ? fateEvents[round] : undefined;
+    const currentTactic = isFateMode ? fateTactics[round] : undefined;
     const aHealth = currentResult?.aHealth ?? currentA?.hp;
     const bHealth = currentResult?.bHealth ?? currentB?.hp;
     const aFaceUp = battleStep !== "reveal";
     const bFaceUp = battleStep !== "reveal";
-    const buttonLabel = battleStep === "reveal" ? `公开第${round + 1}张` : battleStep === "fight" ? "开始战斗" : round === ROUND_COUNT - 1 ? "查看最终结果" : "进入下一局";
+    const buttonLabel = battleStep === "reveal"
+      ? isFateMode ? `公开第${round + 1}局事件与战术` : `公开第${round + 1}张`
+      : battleStep === "fight" ? "开始战斗"
+        : round === activeRoundCount - 1 ? "查看最终结果" : "进入下一局";
     const buttonAction = battleStep === "reveal" ? revealRound : battleStep === "fight" ? startFight : nextRound;
     return (
       <main className="battle-layout">
         <PlayerRail player="A" color="blue" card={currentA} faceUp={aFaceUp} health={aHealth} score={scoreA} status={battleStep === "done" ? (currentResult?.winner === "A" ? "本局胜利" : "继续观察") : "等待裁判公开"} />
         <section className="battle-stage">
           <div className="stage-header">
-            <div><span className="section-kicker">裁判进行中</span><h2>第{round + 1}局 <small>/ 共{ROUND_COUNT}局</small></h2></div>
-            <div className="round-markers">{Array.from({ length: ROUND_COUNT }, (_, index) => <i className={index < round ? "is-past" : index === round ? "is-current" : ""} key={index}>{index < round ? "✓" : index + 1}</i>)}</div>
+            <div><span className="section-kicker">{isFateMode ? "命运事件裁判中" : "裁判进行中"}</span><h2>第{round + 1}局 <small>/ 共{activeRoundCount}局</small></h2></div>
+            <div className="round-markers">{Array.from({ length: activeRoundCount }, (_, index) => <i className={index < round ? "is-past" : index === round ? "is-current" : ""} key={index}>{index < round ? "✓" : index + 1}</i>)}</div>
           </div>
+          {isFateMode && (
+            <div className="fate-public-panel">
+              <div className="fate-event-card"><span>命运事件</span><strong>{battleStep === "reveal" ? "待揭晓" : currentEvent?.name}</strong><small>{battleStep === "reveal" ? "点击公开按钮，查看本局规则" : currentEvent?.description}</small></div>
+              <PublicTacticCard tactic={currentTactic} revealed={battleStep !== "reveal"} />
+            </div>
+          )}
           <div className="duel-table">
             <div className={`duel-card-wrap ${aFaceUp ? "revealed" : ""}`}><CardTile card={currentA} faceUp={aFaceUp} large /></div>
             <div className="versus-mark"><span>VS</span><i /></div>
@@ -815,7 +932,7 @@ function App() {
           </div>
           {currentResult && <div className="battle-result-note"><Flame size={16} /> {winnerLabel(currentResult.winner)} <span>{currentResult.log[currentResult.log.length - 1]}</span></div>}
           <div className="referee-console">
-            <div className="referee-label"><Eye size={18} /><div><strong>裁判</strong><span>只公开当前局，系统自动扣血</span></div></div>
+            <div className="referee-label"><Eye size={18} /><div><strong>裁判</strong><span>{isFateMode ? "先公开事件与战术，再按数值结算本局" : "只公开当前局，系统自动扣血"}</span></div></div>
             <button type="button" className={`primary-action referee-action ${battleStep === "done" ? "is-next" : ""}`} onClick={buttonAction}>
               {battleStep === "reveal" ? <Eye size={18} /> : battleStep === "fight" ? <Swords size={18} /> : <ChevronRight size={18} />}
               {buttonLabel}
@@ -859,19 +976,20 @@ function App() {
       <main className="result-layout">
         <section className="result-hero">
           <div className="result-crown"><Trophy size={32} /></div>
-          <span className="section-kicker">五局结束</span>
+          <span className="section-kicker">{isFateMode ? "命运事件赛结束" : "五局结束"}</span>
           <h2>{finalWinner === "draw" ? "势均力敌，平局" : `${contestantName(finalWinner)}赢下本场`}</h2>
-          <p>{scoreA === scoreB ? "胜局相同时按五张卡的剩余生命判定。" : "卡牌的顺序、稀有度和每一次扣血，都在这一刻留下了结果。"}</p>
+          <p>{isFateMode ? "三局事件与公共战术全部结算完毕；胜局相同时按剩余生命判定。" : scoreA === scoreB ? "胜局相同时按五张卡的剩余生命判定。" : "卡牌的顺序、稀有度和每一次扣血，都在这一刻留下了结果。"}</p>
           <button type="button" className="primary-action action-large" onClick={reset}><RotateCcw size={18} /> 再来一局</button>
         </section>
         <section className="result-table">
-          <div className="result-table-head"><strong>对局回放</strong><span>贝拉阵营 {scoreA} : {scoreB} 芊辰阵营</span></div>
+          <div className="result-table-head"><strong>{isFateMode ? "事件赛战报" : "对局回放"}</strong><span>贝拉阵营 {scoreA} : {scoreB} 芊辰阵营</span></div>
           {roundResults.map((result, index) => (
             <div className="result-row" key={`${result.aCard.id}-${result.bCard.id}`}>
               <span className="result-round">第{index + 1}局</span>
               <div className="result-card-name"><img src={result.aCard.image} alt="" /><span>{result.aCard.name}</span></div>
               <strong className={`result-winner ${result.winner === "A" ? "winner-a" : result.winner === "B" ? "winner-b" : "winner-draw"}`}>{result.winner === "draw" ? "平局" : `${contestantShortName(result.winner)}胜`}</strong>
               <div className="result-card-name is-right"><span>{result.bCard.name}</span><img src={result.bCard.image} alt="" /></div>
+              {isFateMode && <small className="result-fate-rule">{result.event?.name} · {result.tactic?.name}</small>}
             </div>
           ))}
         </section>
