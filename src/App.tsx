@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ArrowLeft,
+  BookOpen,
   ChevronRight,
   CircleUserRound,
   Crown,
@@ -9,6 +11,7 @@ import {
   Heart,
   LockKeyhole,
   RotateCcw,
+  Search,
   Shield,
   Sparkles,
   Swords,
@@ -22,7 +25,7 @@ import "./styles.css";
 
 type Contestant = "A" | "B";
 type GameMode = "duel" | "team";
-type Phase = "lobby" | "private" | "battle" | "result";
+type Phase = "lobby" | "collection" | "private" | "battle" | "result";
 type BattleStep = "reveal" | "fight" | "done";
 type PrivateStage = "draw" | "select";
 type Winner = Contestant | "draw";
@@ -225,6 +228,36 @@ function CardTile({
   );
 }
 
+function CollectionCard({ card }: { card: Card }) {
+  const meta = rarityMeta[card.rarity];
+
+  return (
+    <article className={`collection-card ${rarityClass(card.rarity)}`}>
+      <div className="collection-card-media">
+        <img src={card.image} alt={`${card.name}卡面`} loading="lazy" decoding="async" />
+        <div className={`collection-rarity-mark ${rarityClass(card.rarity)}`}>
+          <strong>{card.rarity}</strong>
+          <span>{meta.label}</span>
+        </div>
+      </div>
+      <div className="collection-card-copy">
+        <div className="collection-card-title">
+          <div>
+            <h3>{card.name}</h3>
+            <p>{card.source}</p>
+          </div>
+          <span className={`collection-rarity-badge ${rarityClass(card.rarity)}`}>{card.rarity}</span>
+        </div>
+        <div className="collection-stats">
+          <StatLine type="hp" value={card.hp} />
+          <StatLine type="atk" value={card.atk} />
+          <StatLine type="def" value={card.def} />
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function StatLine({ type, value }: { type: "hp" | "atk" | "def"; value: number | string }) {
   const Icon = type === "hp" ? Heart : type === "atk" ? Swords : Shield;
   const label = type === "hp" ? "生命" : type === "atk" ? "攻击" : "防御";
@@ -333,9 +366,19 @@ function App() {
   const [battleResult, setBattleResult] = useState<RoundResult | null>(null);
   const [teamBattle, setTeamBattle] = useState<TeamBattleState | null>(null);
   const [soundOn, setSoundOn] = useState(true);
+  const [collectionRarity, setCollectionRarity] = useState<Rarity | "ALL">("ALL");
+  const [collectionQuery, setCollectionQuery] = useState("");
 
   const activePackSize = gameMode === "team" ? TEAM_PACK_SIZE : PACK_SIZE;
   const activeLineupSize = gameMode === "team" ? TEAM_LINEUP_SIZE : LINEUP_SIZE;
+  const collectionCards = useMemo(() => {
+    const query = collectionQuery.trim().toLocaleLowerCase();
+    return cards.filter((card) => {
+      const matchesRarity = collectionRarity === "ALL" || card.rarity === collectionRarity;
+      const matchesQuery = !query || `${card.name} ${card.source}`.toLocaleLowerCase().includes(query);
+      return matchesRarity && matchesQuery;
+    });
+  }, [collectionQuery, collectionRarity]);
   const currentPack = packs[privatePlayer];
   const currentSelection = selection.map((id) => currentPack.find((card) => card.id === id)).filter(Boolean) as Card[];
   const currentDrawCard = currentPack[drawIndex];
@@ -579,7 +622,7 @@ function App() {
         <div className="brand-seal"><Sparkles size={18} /></div>
         <div>
           <h1>贝拉卡斗场</h1>
-          <p>{gameMode === "team" ? "抽10选7 · 团战模式" : "抽8选5 · 1V1裁判模式"}</p>
+          <p>{phase === "collection" ? `${cards.length}张卡牌 · 逐张查看` : gameMode === "team" ? "抽10选7 · 团战模式" : "抽8选5 · 1V1裁判模式"}</p>
         </div>
       </div>
       <div className="header-tools">
@@ -589,7 +632,7 @@ function App() {
         </button>
         <div className="header-state">
           <span className="live-dot" />
-          <span>{phase === "lobby" ? "准备开局" : phase === "private" ? "私密抽卡" : phase === "battle" ? "裁判进行中" : "对局完成"}</span>
+          <span>{phase === "lobby" ? "准备开局" : phase === "collection" ? "卡牌图鉴" : phase === "private" ? "私密抽卡" : phase === "battle" ? "裁判进行中" : "对局完成"}</span>
         </div>
       </div>
     </header>
@@ -636,6 +679,65 @@ function App() {
         <div><span className="section-kicker">本局卡池</span><strong>{cards.length}张动漫卡</strong><small className="pool-rule">每张牌等概率 · 不设稀有度保底</small></div>
         <RarityLegend />
       </section>
+      <section className="collection-entry" aria-label="卡牌图鉴入口">
+        <div className="collection-entry-icon"><BookOpen size={22} /></div>
+        <div className="collection-entry-copy">
+          <span className="section-kicker">卡牌图鉴</span>
+          <strong>一张张看清你的卡池</strong>
+          <small>按稀有度筛选，查看每张卡面的来源、生命、攻击和防御。</small>
+        </div>
+        <button className="secondary-action" type="button" onClick={() => setPhase("collection")}>
+          <BookOpen size={17} /> 打开卡牌图鉴 <ChevronRight size={17} />
+        </button>
+      </section>
+    </main>
+  );
+
+  const renderCollection = () => (
+    <main className="collection-layout">
+      <section className="collection-header">
+        <button className="secondary-action collection-back" type="button" onClick={() => setPhase("lobby")}>
+          <ArrowLeft size={17} /> 返回大厅
+        </button>
+        <div className="collection-heading">
+          <span className="section-kicker">卡牌图鉴 · CARD ARCHIVE</span>
+          <h2>逐张查阅卡池</h2>
+          <p>每一张卡都对应一位角色，卡面与战斗数值一目了然。</p>
+        </div>
+        <div className="collection-total" aria-label={`当前显示${collectionCards.length}张，共${cards.length}张`}>
+          <strong>{collectionCards.length}</strong>
+          <span>/ {cards.length} 张</span>
+        </div>
+      </section>
+      <section className="collection-toolbar" aria-label="筛选卡牌">
+        <label className="collection-search">
+          <Search size={16} />
+          <span className="sr-only">搜索角色或作品</span>
+          <input value={collectionQuery} onChange={(event) => setCollectionQuery(event.target.value)} placeholder="搜索角色或作品" />
+        </label>
+        <div className="collection-filters" role="group" aria-label="按稀有度筛选">
+          <button type="button" className={`collection-filter ${collectionRarity === "ALL" ? "is-active" : ""}`} onClick={() => setCollectionRarity("ALL")}>全部 <small>{cards.length}</small></button>
+          {rarityOrder.map((rarity) => {
+            const count = cards.filter((card) => card.rarity === rarity).length;
+            return (
+              <button type="button" className={`collection-filter ${rarityClass(rarity)} ${collectionRarity === rarity ? "is-active" : ""}`} onClick={() => setCollectionRarity(rarity)} key={rarity}>
+                {rarity} <small>{count}</small>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+      {collectionCards.length > 0 ? (
+        <section className="collection-grid" aria-label="卡牌列表">
+          {collectionCards.map((card) => <CollectionCard card={card} key={card.id} />)}
+        </section>
+      ) : (
+        <section className="collection-empty">
+          <BookOpen size={28} />
+          <strong>没有找到对应卡牌</strong>
+          <span>换个角色名、作品名或稀有度试试。</span>
+        </section>
+      )}
     </main>
   );
 
@@ -886,6 +988,7 @@ function App() {
     <div className="app-shell">
       {renderHeader()}
       {phase === "lobby" && renderLobby()}
+      {phase === "collection" && renderCollection()}
       {phase === "private" && renderPrivate()}
       {phase === "battle" && renderBattle()}
       {phase === "result" && renderResult()}

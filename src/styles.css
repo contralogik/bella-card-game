@@ -68,6 +68,7 @@ button:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 3p
 
 .app-header,
 .lobby-layout,
+.collection-layout,
 .private-layout,
 .battle-layout,
 .result-layout,
@@ -163,6 +164,62 @@ button:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 3p
 .legend-item b { color: currentColor; font-size: 10px; }
 .legend-item small { color: #63728b; }
 .legend-item.rarity-sr { color: #68aeff; }.legend-item.rarity-ssr { color: #b19aff; }.legend-item.rarity-ur { color: #65d9ff; }.legend-item.rarity-hr { color: #cbdbff; }.legend-item.rarity-lgr { color: #f3be55; }.legend-item.rarity-sp { color: #ffcb57; }.legend-item.rarity-csp { color: #bceeff; }
+.collection-entry { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 15px; max-width: 960px; margin: 22px auto 0; padding: 16px 20px; border: 1px solid rgba(86, 153, 233, 0.3); border-radius: 17px; background: linear-gradient(110deg, rgba(10, 31, 65, 0.84), rgba(12, 26, 57, 0.64)); box-shadow: inset 0 1px rgba(255,255,255,0.04); }
+.collection-entry-icon { width: 42px; height: 42px; display: grid; place-items: center; color: #8bc6ff; border: 1px solid rgba(96, 174, 255, 0.48); border-radius: 13px; background: rgba(22, 69, 125, 0.48); }
+.collection-entry-copy { min-width: 0; }
+.collection-entry-copy strong, .collection-entry-copy small { display: block; }
+.collection-entry-copy strong { margin-top: 3px; color: #eaf2ff; font-family: "Noto Serif SC", serif; font-size: 16px; }
+.collection-entry-copy small { margin-top: 4px; color: #8fa5c6; font-size: 11px; }
+.collection-entry .secondary-action { white-space: nowrap; }
+.collection-layout { padding: clamp(32px, 6vh, 70px) 0 40px; }
+.collection-header { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 20px; margin-bottom: 22px; }
+.collection-back { min-height: 40px; white-space: nowrap; }
+.collection-heading { text-align: center; }
+.collection-heading h2 { margin: 5px 0 0; font-family: "Noto Serif SC", "Songti SC", serif; font-size: clamp(28px, 4vw, 44px); letter-spacing: 0.06em; }
+.collection-heading p { margin: 9px 0 0; color: #9aa9c1; font-size: 12px; }
+.collection-total { min-width: 90px; padding: 10px 13px; border-left: 1px solid rgba(225, 176, 76, 0.35); text-align: right; }
+.collection-total strong { display: block; color: var(--gold-bright); font-family: "Noto Serif SC", serif; font-size: 26px; line-height: 1; }
+.collection-total span { display: block; margin-top: 5px; color: #8495b1; font-size: 10px; }
+.collection-toolbar { display: grid; gap: 13px; padding: 14px 16px; border: 1px solid rgba(126, 157, 211, 0.24); border-radius: 17px; background: rgba(7, 20, 43, 0.75); }
+.collection-search { display: flex; align-items: center; gap: 9px; min-height: 42px; padding: 0 13px; color: #82bfff; border: 1px solid rgba(122, 161, 217, 0.3); border-radius: 11px; background: rgba(4, 13, 29, 0.55); }
+.collection-search input { width: 100%; min-width: 0; color: #eef4ff; border: 0; outline: 0; background: transparent; font-size: 12px; }
+.collection-search input::placeholder { color: #6f83a4; }
+.collection-filters { display: flex; gap: 7px; overflow-x: auto; padding: 1px 1px 3px; scrollbar-width: thin; }
+.collection-filter { display: inline-flex; align-items: center; gap: 6px; min-height: 31px; flex: 0 0 auto; padding: 0 11px; color: #9eacc3; border: 1px solid rgba(125, 156, 207, 0.28); border-radius: 999px; background: rgba(8, 24, 49, 0.68); cursor: pointer; font-size: 10px; font-weight: 800; transition: color 180ms ease, border-color 180ms ease, background 180ms ease, transform 180ms ease; }
+.collection-filter:hover { transform: translateY(-1px); color: #eaf3ff; border-color: rgba(137, 190, 255, 0.62); }
+.collection-filter small { color: #617493; font-size: 9px; }
+.collection-filter.is-active { color: #182038; border-color: #f6d17a; background: var(--gold-bright); }
+.collection-filter.is-active small { color: #6e5525; }
+.collection-filter.rarity-sr.is-active { color: #0c2347; border-color: #8cc8ff; background: #73baff; }
+.collection-filter.rarity-ssr.is-active { color: #1e1245; border-color: #cbbcff; background: #b49aff; }
+.collection-filter.rarity-ur.is-active { color: #06283c; border-color: #8be9ff; background: #67d9ef; }
+.collection-filter.rarity-hr.is-active { color: #17223b; border-color: #e3ebff; background: #c9d7f4; }
+.collection-filter.rarity-lgr.is-active, .collection-filter.rarity-sp.is-active { color: #35230a; border-color: #ffdc86; background: #e9ad46; }
+.collection-filter.rarity-csp.is-active { color: #09273c; border-color: #dbf8ff; background: #bceeff; }
+.collection-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.collection-card { min-width: 0; overflow: hidden; border: 1px solid rgba(126, 157, 211, 0.28); border-radius: 16px; background: linear-gradient(155deg, rgba(14, 33, 66, 0.92), rgba(5, 15, 33, 0.96)); box-shadow: 0 13px 28px rgba(0,0,0,0.19), inset 0 1px rgba(255,255,255,0.04); transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
+.collection-card:hover { transform: translateY(-4px); border-color: rgba(236, 194, 99, 0.68); box-shadow: 0 18px 34px rgba(0,0,0,0.28), 0 0 22px rgba(220, 172, 68, 0.13); }
+.collection-card-media { position: relative; aspect-ratio: 2 / 3; overflow: hidden; background: #091b38; }
+.collection-card-media::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 56%, rgba(2, 8, 21, 0.58)); }
+.collection-card-media img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.collection-rarity-mark { position: absolute; z-index: 1; top: 9px; left: 9px; display: grid; gap: 2px; min-width: 46px; padding: 6px 7px; border: 1px solid rgba(255, 225, 148, 0.64); border-radius: 9px; background: rgba(4, 13, 31, 0.78); box-shadow: 0 5px 15px rgba(0,0,0,0.25); }
+.collection-rarity-mark strong { color: #f7d781; font-size: 13px; line-height: 1; }
+.collection-rarity-mark span { color: #93a9c7; font-size: 8px; white-space: nowrap; }
+.collection-rarity-mark.rarity-sr strong { color: #73baff; }.collection-rarity-mark.rarity-ssr strong { color: #b9a5ff; }.collection-rarity-mark.rarity-ur strong { color: #6fe4ff; }.collection-rarity-mark.rarity-hr strong { color: #d1dcf6; }.collection-rarity-mark.rarity-lgr strong, .collection-rarity-mark.rarity-sp strong { color: #ffcf5b; }.collection-rarity-mark.rarity-csp strong { color: #c9f2ff; }
+.collection-card-copy { padding: 12px 12px 13px; }
+.collection-card-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; min-height: 40px; }
+.collection-card-title h3 { margin: 0; overflow: hidden; color: #edf3ff; font-family: "Noto Serif SC", serif; font-size: 13px; font-weight: 700; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.collection-card-title p { margin: 4px 0 0; overflow: hidden; color: #879bb9; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.collection-rarity-badge { flex: 0 0 auto; min-width: 30px; padding: 4px 5px; color: #f6d27e; border: 1px solid rgba(230, 184, 83, 0.45); border-radius: 6px; background: rgba(90, 57, 17, 0.35); font-size: 9px; font-weight: 900; text-align: center; }
+.collection-rarity-badge.rarity-sr { color: #75bfff; border-color: rgba(94, 169, 255, 0.54); background: rgba(28, 76, 137, 0.34); }.collection-rarity-badge.rarity-ssr { color: #c2b2ff; border-color: rgba(170, 143, 255, 0.54); background: rgba(67, 44, 126, 0.34); }.collection-rarity-badge.rarity-ur { color: #80eaff; border-color: rgba(83, 218, 255, 0.54); background: rgba(20, 93, 122, 0.34); }.collection-rarity-badge.rarity-hr { color: #d4def7; border-color: rgba(201, 217, 250, 0.54); background: rgba(87, 102, 132, 0.34); }.collection-rarity-badge.rarity-lgr, .collection-rarity-badge.rarity-sp { color: #ffd05f; border-color: rgba(255, 197, 68, 0.54); background: rgba(107, 67, 16, 0.34); }.collection-rarity-badge.rarity-csp { color: #d2f5ff; border-color: rgba(170, 235, 255, 0.6); background: rgba(40, 107, 135, 0.34); }
+.collection-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 11px; padding-top: 10px; border-top: 1px solid rgba(146, 175, 223, 0.13); }
+.collection-stats .stat-line { gap: 4px; min-width: 0; color: #8195b4; font-size: 9px; }
+.collection-stats .stat-line span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.collection-stats .stat-line strong { color: #e4ebf7; font-size: 10px; }
+.collection-empty { display: grid; justify-items: center; gap: 7px; margin-top: 18px; padding: 70px 20px; color: #80a0c7; border: 1px dashed rgba(120, 156, 211, 0.35); border-radius: 17px; background: rgba(7, 20, 43, 0.55); text-align: center; }
+.collection-empty strong { color: #e9f0fb; font-family: "Noto Serif SC", serif; }
+.collection-empty span { color: #8194b0; font-size: 11px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .private-layout { padding: clamp(35px, 7vh, 78px) 0 32px; max-width: 1040px; }
 .private-header { display: flex; align-items: center; gap: 16px; position: relative; margin-bottom: 26px; }
@@ -228,11 +285,11 @@ button:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 3p
 .app-footer { display: flex; justify-content: space-between; padding: 17px 2px 0; color: #4e617e; font-size: 10px; letter-spacing: 0.08em; }
 
 @media (max-width: 1040px) {
-  .battle-layout { grid-template-columns: 165px minmax(0, 1fr) 165px; gap: 14px; }.player-rail { padding-inline: 11px; }.rail-card-slot .card-tile-large { width: 145px; }.duel-table { gap: 14px; }.duel-card-wrap { width: min(42%, 188px); }
+  .battle-layout { grid-template-columns: 165px minmax(0, 1fr) 165px; gap: 14px; }.player-rail { padding-inline: 11px; }.rail-card-slot .card-tile-large { width: 145px; }.duel-table { gap: 14px; }.duel-card-wrap { width: min(42%, 188px); }.collection-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 780px) {
-  .app-shell { padding-inline: 14px; overflow: visible; }.app-header { padding-bottom: 16px; }.header-state { font-size: 10px; }.lobby-layout { padding-top: 52px; }.mode-picker { grid-template-columns: 1fr; max-width: 420px; }.lobby-roles { grid-template-columns: 1fr; max-width: 420px; margin-top: 44px; }.pool-strip { display: block; }.pool-strip > div:first-child { justify-content: space-between; }.rarity-legend { justify-content: flex-start; margin-top: 15px; }.private-pack { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }.private-actions { align-items: stretch; flex-direction: column; }.private-actions .primary-action, .private-actions .secondary-action { width: 100%; }.private-header h2 { font-size: 23px; }.battle-layout { grid-template-columns: 1fr; min-height: auto; padding-top: 18px; }.player-rail { min-height: 0; display: grid; grid-template-columns: 1fr 80px; grid-template-rows: auto auto; gap: 7px 12px; align-items: center; }.player-rail-head { grid-column: 1 / -1; }.rail-card-slot { grid-row: 2; grid-column: 2; padding: 0; }.rail-card-slot .card-tile-large { width: 72px; }.rail-status { grid-column: 1; grid-row: 2; text-align: left; margin: 0; }.rail-stats, .health-track { display: none; }.team-roster { grid-column: 1 / -1; grid-row: 3; padding-top: 8px; border-top: 0; }.team-roster-chip { min-height: 43px; }.rail-violet { order: 3; }.battle-stage { order: 2; padding-inline: 12px; }.duel-table { min-height: 290px; padding-inline: 4px; }.duel-card-wrap { width: 39%; }.health-duel { gap: 15px; padding-inline: 2%; }.team-battle-rule { line-height: 1.45; text-align: center; }.referee-console { align-items: stretch; flex-direction: column; }.referee-action { width: 100%; }.result-layout { padding-top: 36px; }.result-row { grid-template-columns: 47px 1fr 47px 1fr; gap: 7px; padding-inline: 11px; }.result-card-name { font-size: 10px; }.result-card-name img { width: 23px; height: 34px; }.result-card-name.is-right { gap: 5px; }.result-winner { font-size: 10px; }.team-result-row .result-card-name small { font-size: 7px; }.app-footer { font-size: 9px; }
+  .app-shell { padding-inline: 14px; overflow: visible; }.app-header { padding-bottom: 16px; }.header-state { font-size: 10px; }.lobby-layout { padding-top: 52px; }.mode-picker { grid-template-columns: 1fr; max-width: 420px; }.lobby-roles { grid-template-columns: 1fr; max-width: 420px; margin-top: 44px; }.pool-strip { display: block; }.pool-strip > div:first-child { justify-content: space-between; }.rarity-legend { justify-content: flex-start; margin-top: 15px; }.collection-entry { grid-template-columns: auto 1fr; }.collection-entry .secondary-action { grid-column: 1 / -1; width: 100%; }.collection-layout { padding-top: 28px; }.collection-header { grid-template-columns: 1fr auto; gap: 12px; }.collection-back { grid-column: 1 / -1; justify-self: start; }.collection-heading { text-align: left; }.collection-heading h2 { font-size: 29px; }.collection-total { min-width: 75px; }.collection-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }.collection-card-copy { padding: 10px 9px 11px; }.collection-card-title h3 { font-size: 11px; }.collection-card-title p { font-size: 9px; }.collection-stats { gap: 3px; }.collection-stats .stat-line { gap: 3px; font-size: 8px; }.collection-stats .stat-line strong { font-size: 9px; }.private-pack { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }.private-actions { align-items: stretch; flex-direction: column; }.private-actions .primary-action, .private-actions .secondary-action { width: 100%; }.private-header h2 { font-size: 23px; }.battle-layout { grid-template-columns: 1fr; min-height: auto; padding-top: 18px; }.player-rail { min-height: 0; display: grid; grid-template-columns: 1fr 80px; grid-template-rows: auto auto; gap: 7px 12px; align-items: center; }.player-rail-head { grid-column: 1 / -1; }.rail-card-slot { grid-row: 2; grid-column: 2; padding: 0; }.rail-card-slot .card-tile-large { width: 72px; }.rail-status { grid-column: 1; grid-row: 2; text-align: left; margin: 0; }.rail-stats, .health-track { display: none; }.team-roster { grid-column: 1 / -1; grid-row: 3; padding-top: 8px; border-top: 0; }.team-roster-chip { min-height: 43px; }.rail-violet { order: 3; }.battle-stage { order: 2; padding-inline: 12px; }.duel-table { min-height: 290px; padding-inline: 4px; }.duel-card-wrap { width: 39%; }.health-duel { gap: 15px; padding-inline: 2%; }.team-battle-rule { line-height: 1.45; text-align: center; }.referee-console { align-items: stretch; flex-direction: column; }.referee-action { width: 100%; }.result-layout { padding-top: 36px; }.result-row { grid-template-columns: 47px 1fr 47px 1fr; gap: 7px; padding-inline: 11px; }.result-card-name { font-size: 10px; }.result-card-name img { width: 23px; height: 34px; }.result-card-name.is-right { gap: 5px; }.result-winner { font-size: 10px; }.team-result-row .result-card-name small { font-size: 7px; }.app-footer { font-size: 9px; }
 }
 
 @media (max-width: 780px) {
